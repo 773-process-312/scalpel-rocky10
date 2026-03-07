@@ -1,4 +1,4 @@
-# Niksun PCAP Recovery Workflow
+# Network Collection PCAP Recovery Workflow
 ## Rocky Linux 10 | Scalpel 2.1 | Forensic Data Recovery
 
 This document covers the full workflow for recovering PCAP capture data
