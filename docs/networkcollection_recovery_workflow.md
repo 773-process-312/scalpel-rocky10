@@ -9,7 +9,7 @@ from a network capture appliance using a Rocky Linux 10 workstation.
 ## Prerequisites
 
 - Rocky Linux 10 workstation (this machine) with Scalpel installed
-- SSH access to the Niksun appliance (root or equivalent)
+- SSH access to the Network Collection appliance (root or equivalent)
 - Sufficient local storage for samples (at minimum 10GB free; more for full recovery)
 - `tmux` installed for long-running transfers
 
@@ -27,20 +27,20 @@ tmux attach -t recovery
 
 ---
 
-## Phase 2: Identify the Storage Device on the Niksun
+## Phase 2: Identify the Storage Device on the network_collection_device
 
 ```bash
 # Test basic connectivity
-ssh root@<networkcollection_ip> "echo OK"
+ssh root@<network_collection_device_ip> "echo OK"
 
 # If connection is refused (old SSH daemon on appliance):
-ssh networkcollection root@<niksun_ip> "echo OK"
+ssh network_collection_device root@<network_collection_device_ip> "echo OK"
 
 # List block devices on the appliance
-ssh root@<networkcollection> "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT"
+ssh root@<network_collection_device> "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT"
 
 # Check disk usage
-ssh root@<niksun_ip> "df -h"
+ssh root@<network_collection_device_ip> "df -h"
 ```
 
 Look for the largest partition — typically `/dev/sdb1`, `/dev/sdc1`, or `/dev/md0`.
@@ -54,18 +54,18 @@ Start with 1GB to validate the approach before committing to a full transfer.
 
 ```bash
 # With live progress bar (recommended)
-ssh root@<networkcollection> \
+ssh root@<network_collection_device> \
     "dd if=/dev/sdb1 bs=1M count=1024 status=none" \
     | pv -s 1073741824 \
-    > /opt/nicks/samples/networkcollection.dd
+    > /opt/nicks/samples/network_collection_device.dd
 
 # Without pv
-ssh root@<networkcollection> \
+ssh root@<network_collection_device> \
     "dd if=/dev/sdb1 bs=1M count=1024" \
-    > /opt/nicks/samples/networkcollection.dd
+    > /opt/nicks/samples/network_collection_device.dd
 
 # Verify
-ls -lh /opt/nicks/samples/networkcollection.dd
+ls -lh /opt/nicks/samples/network_collection_device.dd
 # Expected: approximately 1.0G
 ```
 
@@ -77,10 +77,10 @@ Before carving, confirm PCAP data is present in the sample.
 
 ```bash
 # Search for big-endian PCAP magic (standard libpcap)
-xxd /opt/nicks/samples/networkcollection.dd | grep -m 10 "a1b2 c3d4"
+xxd /opt/nicks/samples/network_collection_device.dd | grep -m 10 "a1b2 c3d4"
 
 # Search for little-endian PCAP magic (some appliance formats)
-xxd /opt/nicks/samples/networkcollection.dd | grep -m 10 "d4c3 b2a1"
+xxd /opt/nicks/samples/network_collection_device.dd | grep -m 10 "d4c3 b2a1"
 ```
 
 If neither produces output, either:
@@ -90,15 +90,15 @@ If neither produces output, either:
 **Sampling from a different offset:**
 ```bash
 # Skip the first 10GB, sample the next 1GB
-ssh root@<niksun_ip> \
+ssh root@<network_collection_device_ip> \
     "dd if=/dev/sdb1 bs=1M skip=10240 count=1024 status=none" \
     | pv -s 1073741824 \
-    > /opt/nicks/samples/networkcollection10g.dd
+    > /opt/nicks/samples/network_collection_device10g.dd
 ```
 
 **Interactive hex inspection:**
 ```bash
-hexedit /opt/nicks/samples/networkcollection.dd
+hexedit /opt/nicks/samples/network_collection_device.dd
 # Ctrl+S → search hex → type: a1b2c3d4 → Enter
 # Ctrl+S → search hex → type: d4c3b2a1 → Enter
 ```
@@ -110,7 +110,7 @@ hexedit /opt/nicks/samples/networkcollection.dd
 ```bash
 # IMPORTANT: The output directory must NOT already exist
 scalpel \
-    /opt/nicks/samples/networkcollection.dd \
+    /opt/nicks/samples/network_collection_device.dd \
     -o /opt/nicks/recovery_output
 
 # Check results
@@ -123,7 +123,7 @@ ls /opt/nicks/recovery_output/pcap*/ | wc -l
 **To re-run scalpel** (output dir must be removed first):
 ```bash
 rm -rf /opt/nicks/recovery_output
-scalpel /opt/nicks/samples/networkcollection.dd \
+scalpel /opt/nicks/samples/network_collection_device.dd \
     -o /opt/nicks/recovery_output
 ```
 
@@ -162,7 +162,7 @@ Once PCAP data is confirmed in the sample, scale to the full device.
 tmux new -s full_recovery
 
 # Full device transfer with progress and log
-ssh root@<networkcollection> \
+ssh root@<network_collection_device> \
     "dd if=/dev/sdb1 bs=1M status=none" \
     | pv \
     | tee /opt/nicks/samples/full_recovery.dd \
@@ -201,10 +201,10 @@ sudo ldconfig
 export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
 ```
 
-**SSH connection refused (old Niksun appliance):**
+**SSH connection refused (old network_collection_device appliance):**
 ```bash
 # Use the legacy host alias (set up by the workstation prep script)
-ssh networkcollection root@<networkcollection>
+ssh network_collection_device root@<network_collection_device>
 ```
 
 **Scalpel output directory already exists:**
@@ -215,7 +215,7 @@ rm -rf /opt/nicks/recovery_output
 
 **No PCAP magic bytes found in sample:**
 - Try a different offset (see Phase 4 above)
-- The networkcollection may store data in a proprietary format — inspect raw bytes with hexedit
+- The network_collection_device may store data in a proprietary format — inspect raw bytes with hexedit
 - Check if data is compressed or encrypted
 
 ---
