@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Build artifacts
+/tmp/
+*.o
+*.la
+*.lo
+
+# Backup files created by the install scripts
+*.bak.*
+*.bak
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# The actual binary files are tracked intentionally in bin/ and lib/
+# Do NOT add bin/ or lib/ to .gitignore

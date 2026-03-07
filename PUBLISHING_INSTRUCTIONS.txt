@@ -1,0 +1,77 @@
+# HOW TO PUBLISH THIS REPO TO GITHUB
+# Run these commands on your Rocky Linux 10.1 machine (nixtransfer)
+# =====================================================================
+
+# ---- STEP 1: Install git if not present ----
+sudo dnf install -y git
+
+# ---- STEP 2: Copy the binary and library from your system ----
+# (run from wherever you placed the scalpel-rocky10/ repo directory)
+
+cp /usr/local/bin/scalpel              scalpel-rocky10/bin/scalpel
+cp /usr/local/lib/libtre.so.5.0.0     scalpel-rocky10/lib/libtre.so.5.0.0
+
+# Create symlinks (git will track these as symlinks)
+cd scalpel-rocky10/lib
+ln -sf libtre.so.5.0.0 libtre.so.5
+ln -sf libtre.so.5.0.0 libtre.so
+cd ../..
+
+# Copy your scalpel config
+cp /etc/scalpel/scalpel.conf          scalpel-rocky10/config/scalpel.conf
+
+# ---- STEP 3: Verify checksums match what's documented in README ----
+sha256sum scalpel-rocky10/bin/scalpel
+# Expected: 1179ffa678ced34028d8dde7320ea1e361885629aed6b8fad16625842c1d9181
+
+sha256sum scalpel-rocky10/lib/libtre.so.5.0.0
+# Expected: 6a6debff50ffac64a64ccc9dbdf86b4d63542eddfc0ea8141b3e61faeb1a735b
+
+# ---- STEP 4: Configure git identity ----
+git config --global user.name "Your Name"
+git config --global user.email "your@email.com"
+
+# ---- STEP 5: Initialize the repo ----
+cd scalpel-rocky10
+git init
+git add .
+git commit -m "Initial release: Scalpel 2.1 for Rocky Linux 10.1 (x86_64)"
+
+# ---- STEP 6: Create a GitHub repo ----
+# Go to https://github.com/new
+# Name it: scalpel-rocky10
+# Set it to Public
+# Do NOT initialize with README (we have our own)
+# Click "Create repository"
+
+# ---- STEP 7: Push to GitHub ----
+git remote add origin https://github.com/YOUR_USERNAME/scalpel-rocky10.git
+git branch -M main
+git push -u origin main
+
+# ---- STEP 8: Create a GitHub Release with the binary tarball ----
+# This makes the binary downloadable without cloning the full repo.
+
+# Create the release tarball
+tar -czf scalpel-2.1-rocky10.1-x86_64.tar.gz \
+    bin/scalpel \
+    lib/libtre.so.5.0.0 \
+    config/scalpel.conf \
+    scripts/install_prebuilt.sh \
+    scripts/scalpel_fix.sh \
+    docs/niksun_recovery_workflow.md \
+    README.md
+
+# Then on GitHub:
+# 1. Go to your repo → Releases → "Create a new release"
+# 2. Tag: v2.1-rocky10
+# 3. Title: "Scalpel 2.1 for Rocky Linux 10.1 (x86_64)"
+# 4. Upload: scalpel-2.1-rocky10.1-x86_64.tar.gz
+# 5. Add description from the README binary details table
+# 6. Publish release
+
+# ---- STEP 9: Update the workstation prep script ----
+# Replace the scalpel download section in prepare_forensic_workstation_v4.sh
+# with a reference to this repo's release tarball URL, for example:
+#
+# RELEASE_URL="https://github.com/YOUR_USERNAME/scalpel-rocky10/releases/download/v2.1-rocky10/scalpel-2.1-rocky10.1-x86_64.tar.gz"
