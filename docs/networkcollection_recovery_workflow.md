@@ -2,7 +2,7 @@
 ## Rocky Linux 10 | Scalpel 2.1 | Forensic Data Recovery
 
 This document covers the full workflow for recovering PCAP capture data
-from a Niksun network capture appliance using a Rocky Linux 10 workstation.
+from a network capture appliance using a Rocky Linux 10 workstation.
 
 ---
 
@@ -31,13 +31,13 @@ tmux attach -t recovery
 
 ```bash
 # Test basic connectivity
-ssh root@<niksun_ip> "echo OK"
+ssh root@<networkcollection_ip> "echo OK"
 
 # If connection is refused (old SSH daemon on appliance):
-ssh niksun_legacy root@<niksun_ip> "echo OK"
+ssh networkcollection root@<niksun_ip> "echo OK"
 
 # List block devices on the appliance
-ssh root@<niksun_ip> "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT"
+ssh root@<networkcollection> "lsblk -o NAME,SIZE,TYPE,MOUNTPOINT"
 
 # Check disk usage
 ssh root@<niksun_ip> "df -h"
@@ -54,18 +54,18 @@ Start with 1GB to validate the approach before committing to a full transfer.
 
 ```bash
 # With live progress bar (recommended)
-ssh root@<niksun_ip> \
+ssh root@<networkcollection> \
     "dd if=/dev/sdb1 bs=1M count=1024 status=none" \
     | pv -s 1073741824 \
-    > /opt/niksun_forensics/samples/niksun_sample.dd
+    > /opt/nicks/samples/networkcollection.dd
 
 # Without pv
-ssh root@<niksun_ip> \
+ssh root@<networkcollection> \
     "dd if=/dev/sdb1 bs=1M count=1024" \
-    > /opt/niksun_forensics/samples/niksun_sample.dd
+    > /opt/nicks/samples/networkcollection.dd
 
 # Verify
-ls -lh /opt/niksun_forensics/samples/niksun_sample.dd
+ls -lh /opt/nicks/samples/networkcollection.dd
 # Expected: approximately 1.0G
 ```
 
@@ -77,10 +77,10 @@ Before carving, confirm PCAP data is present in the sample.
 
 ```bash
 # Search for big-endian PCAP magic (standard libpcap)
-xxd /opt/niksun_forensics/samples/niksun_sample.dd | grep -m 10 "a1b2 c3d4"
+xxd /opt/nicks/samples/networkcollection.dd | grep -m 10 "a1b2 c3d4"
 
 # Search for little-endian PCAP magic (some appliance formats)
-xxd /opt/niksun_forensics/samples/niksun_sample.dd | grep -m 10 "d4c3 b2a1"
+xxd /opt/nicks/samples/networkcollection.dd | grep -m 10 "d4c3 b2a1"
 ```
 
 If neither produces output, either:
@@ -93,12 +93,12 @@ If neither produces output, either:
 ssh root@<niksun_ip> \
     "dd if=/dev/sdb1 bs=1M skip=10240 count=1024 status=none" \
     | pv -s 1073741824 \
-    > /opt/niksun_forensics/samples/niksun_sample_offset10g.dd
+    > /opt/nicks/samples/networkcollection10g.dd
 ```
 
 **Interactive hex inspection:**
 ```bash
-hexedit /opt/niksun_forensics/samples/niksun_sample.dd
+hexedit /opt/nicks/samples/networkcollection.dd
 # Ctrl+S → search hex → type: a1b2c3d4 → Enter
 # Ctrl+S → search hex → type: d4c3b2a1 → Enter
 ```
@@ -110,21 +110,21 @@ hexedit /opt/niksun_forensics/samples/niksun_sample.dd
 ```bash
 # IMPORTANT: The output directory must NOT already exist
 scalpel \
-    /opt/niksun_forensics/samples/niksun_sample.dd \
-    -o /opt/niksun_forensics/recovery_output
+    /opt/nicks/samples/networkcollection.dd \
+    -o /opt/nicks/recovery_output
 
 # Check results
-ls -lh /opt/niksun_forensics/recovery_output/pcap*/
+ls -lh /opt/nicks/recovery_output/pcap*/
 
 # Count carved files
-ls /opt/niksun_forensics/recovery_output/pcap*/ | wc -l
+ls /opt/nicks/recovery_output/pcap*/ | wc -l
 ```
 
 **To re-run scalpel** (output dir must be removed first):
 ```bash
-rm -rf /opt/niksun_forensics/recovery_output
-scalpel /opt/niksun_forensics/samples/niksun_sample.dd \
-    -o /opt/niksun_forensics/recovery_output
+rm -rf /opt/nicks/recovery_output
+scalpel /opt/nicks/samples/networkcollection.dd \
+    -o /opt/nicks/recovery_output
 ```
 
 ---
@@ -133,19 +133,19 @@ scalpel /opt/niksun_forensics/samples/niksun_sample.dd \
 
 ```bash
 # Check if a carved file is a valid PCAP
-file /opt/niksun_forensics/recovery_output/pcap-0-0.pcap
+file /opt/nicks/recovery_output/pcap-0-0.pcap
 
 # Quick packet summary
-tshark -r /opt/niksun_forensics/recovery_output/pcap-0-0.pcap | head -50
+tshark -r /opt/nicks/recovery_output/pcap-0-0.pcap | head -50
 
 # Protocol hierarchy
-tshark -r /opt/niksun_forensics/recovery_output/pcap-0-0.pcap -q -z io,phs
+tshark -r /opt/nicks/recovery_output/pcap-0-0.pcap -q -z io,phs
 
 # Traffic statistics
-tshark -r /opt/niksun_forensics/recovery_output/pcap-0-0.pcap -q -z io,stat,0
+tshark -r /opt/nicks/recovery_output/pcap-0-0.pcap -q -z io,stat,0
 
 # Batch validate all carved pcap files
-for f in /opt/niksun_forensics/recovery_output/pcap*/*.pcap; do
+for f in /opt/nicks/recovery_output/pcap*/*.pcap; do
     result=$(file "$f" | grep -o "tcpdump\|pcap\|capture" || echo "INVALID")
     echo "$result : $f"
 done
@@ -162,16 +162,16 @@ Once PCAP data is confirmed in the sample, scale to the full device.
 tmux new -s full_recovery
 
 # Full device transfer with progress and log
-ssh root@<niksun_ip> \
+ssh root@<networkcollection> \
     "dd if=/dev/sdb1 bs=1M status=none" \
     | pv \
-    | tee /opt/niksun_forensics/samples/full_recovery.dd \
-    > /opt/niksun_forensics/logs/transfer_$(date +%Y%m%d_%H%M%S).log
+    | tee /opt/nicks/samples/full_recovery.dd \
+    > /opt/nicks/logs/transfer_$(date +%Y%m%d_%H%M%S).log
 
 # Then carve the full image
 scalpel \
-    /opt/niksun_forensics/samples/full_recovery.dd \
-    -o /opt/niksun_forensics/recovery_output_full
+    /opt/nicks/samples/full_recovery.dd \
+    -o /opt/nicks/recovery_output_full
 ```
 
 **Count reference for dd:**
@@ -204,18 +204,18 @@ export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
 **SSH connection refused (old Niksun appliance):**
 ```bash
 # Use the legacy host alias (set up by the workstation prep script)
-ssh niksun_legacy root@<niksun_ip>
+ssh networkcollection root@<networkcollection>
 ```
 
 **Scalpel output directory already exists:**
 ```bash
-rm -rf /opt/niksun_forensics/recovery_output
+rm -rf /opt/nicks/recovery_output
 # Then re-run scalpel
 ```
 
 **No PCAP magic bytes found in sample:**
 - Try a different offset (see Phase 4 above)
-- The Niksun may store data in a proprietary format — inspect raw bytes with hexedit
+- The networkcollection may store data in a proprietary format — inspect raw bytes with hexedit
 - Check if data is compressed or encrypted
 
 ---
