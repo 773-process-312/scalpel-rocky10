@@ -128,7 +128,7 @@ scalpel-rocky10/
 │   ├── build_from_source.sh     # Full source build script
 │   └── scalpel_fix.sh           # C++17 patch script (used by build script)
 └── docs/
-    └── niksun_recovery_workflow.md
+    └── network_collection_workflow.md
 ```
 
 ---
